@@ -1,5 +1,5 @@
 {
-    "name": "vgarvardt/zf-simple-migrations",
+    "name": "nicolas-berezin/zf-simple-migrations",
     "description": "Module for database migrations management.",
     "type": "library",
     "license": "BSD-3-Clause",
@@ -9,17 +9,12 @@
         "migrations",
         "zf2"
     ],
-    "homepage": "https://github.com/vgarvardt/ZfSimpleMigrations",
+    "homepage": "https://github.com/nicolas-berezin/ZfSimpleMigrations",
     "authors": [
         {
-            "name": "Vadim Knyzev",
-            "email": "vadim.knyzev@gmail.com",
-            "homepage": "http://vadim-knyzev.blogspot.com/"
-        },
-        {
-            "name": "Vladimir Garvardt",
-            "email": "vgarvardt@gmail.com",
-            "homepage": "http://itskrig.com/"
+            "name": "Nicolas Berezin",
+            "email": "nicolas.berezin@gmail.com",
+            "homepage": "http://berez.in"
         }
     ],
     "require": {
