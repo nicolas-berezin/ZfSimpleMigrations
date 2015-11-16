@@ -15,6 +15,11 @@ class MigrationVersion
      */
     protected $version;
 
+    /**
+     * @var string
+     */
+    protected $source;
+
     public function exchangeArray($data)
     {
         foreach (array_keys(get_object_vars($this)) as $property) {
@@ -52,5 +57,21 @@ class MigrationVersion
     public function getVersion()
     {
         return $this->version;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSource()
+    {
+        return $this->source;
+    }
+
+    /**
+     * @param string $source
+     */
+    public function setSource($source)
+    {
+        $this->source = $source;
     }
 }

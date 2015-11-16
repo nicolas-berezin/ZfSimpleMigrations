@@ -1,6 +1,7 @@
 <?php
 namespace ZfSimpleMigrations\Model;
 
+use Zend\Db\Sql\Expression;
 use Zend\Db\Sql\Select;
 use Zend\Db\TableGateway\TableGateway;
 
@@ -16,9 +17,9 @@ class MigrationVersionTable
         $this->tableGateway = $tableGateway;
     }
 
-    public function save($version)
+    public function save($version, $source)
     {
-        $this->tableGateway->insert(['version' => $version]);
+        $this->tableGateway->insert(['version' => $version, 'source' => $source]);
         return $this->tableGateway->lastInsertValue;
     }
 
@@ -41,4 +42,23 @@ class MigrationVersionTable
         if (!$result->count()) return 0;
         return $result->current()->getVersion();
     }
+
+    public function getCurrentSourceVersions()
+    {
+        $data = [];
+        $result = $this->tableGateway->select(function (Select $select) {
+            $select->columns(['version' => new Expression('MAX(version)'), 'source'])
+                ->order('version DESC')
+                ->group('source');
+        });
+        if (!$result->count()) return $data;
+
+        foreach ($result as $row) {
+            $data[$row->getSource()] = $row->getVersion();
+        }
+
+        return $data;
+    }
+
+
 }

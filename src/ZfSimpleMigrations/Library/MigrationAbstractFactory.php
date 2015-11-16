@@ -61,8 +61,8 @@ class MigrationAbstractFactory implements AbstractFactoryInterface
         $output = null;
         if (isset($migration_config['show_log']) && $migration_config['show_log']) {
             $console = $serviceLocator->get('console');
-            $output = new OutputWriter(function ($message) use ($console) {
-                $console->write($message . "\n");
+            $output = new OutputWriter(function ($message, $color = null) use ($console) {
+                $console->write($message . "\n", $color);
             });
         }
 

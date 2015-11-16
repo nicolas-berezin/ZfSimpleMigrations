@@ -23,6 +23,7 @@ class Migration implements ServiceLocatorAwareInterface
     protected $migrationsDir;
     protected $migrationsNamespace;
     protected $adapter;
+    protected $source;
     /**
      * @var \Zend\Db\Adapter\Driver\ConnectionInterface
      */
@@ -56,7 +57,7 @@ class Migration implements ServiceLocatorAwareInterface
         $this->adapter = $adapter;
         $this->metadata = new Metadata($this->adapter);
         $this->connection = $this->adapter->getDriver()->getConnection();
-        $this->migrationsDir = $config['dir'];
+        $this->migrationsDir = is_array($config['dir']) ? $config['dir'] : ['default' => $config['dir']];
         $this->migrationsNamespace = $config['namespace'];
         $this->migrationVersionTable = $migrationVersionTable;
         $this->outputWriter = is_null($writer) ? new OutputWriter() : $writer;
@@ -67,23 +68,25 @@ class Migration implements ServiceLocatorAwareInterface
         if (is_null($this->migrationsNamespace))
             throw new MigrationException('Unknown namespaces!');
 
-        if (!is_dir($this->migrationsDir)) {
-            if (!mkdir($this->migrationsDir, 0775)) {
-                throw new MigrationException(sprintf('Failed to create migrations directory %s', $this->migrationsDir));
+
+        foreach ($this->migrationsDir as $source) {
+            if (!is_dir($source)) {
+                if (!mkdir($source, 0775)) {
+                    throw new MigrationException(sprintf('Failed to create migrations directory %s', $source));
+                }
             }
         }
-
-        $this->checkCreateMigrationTable();
     }
 
     /**
      * Create migrations table of not exists
      */
-    protected function checkCreateMigrationTable()
+    public function checkCreateMigrationTable()
     {
         $table = new Ddl\CreateTable(MigrationVersion::TABLE_NAME);
         $table->addColumn(new Ddl\Column\Integer('id', false, null, ['autoincrement' => true]));
         $table->addColumn(new Ddl\Column\BigInteger('version'));
+        $table->addColumn(new Ddl\Column\Varchar('source', 64));
         $table->addConstraint(new Ddl\Constraint\PrimaryKey('id'));
         $table->addConstraint(new Ddl\Constraint\UniqueKey('version'));
 
@@ -106,21 +109,32 @@ class Migration implements ServiceLocatorAwareInterface
     }
 
     /**
+     * @return int
+     */
+    public function getCurrentSourceVersions()
+    {
+        return $this->migrationVersionTable->getCurrentSourceVersions();
+    }
+
+    /**
      * @param int $version target migration version, if not set all not applied available migrations will be applied
      * @param bool $force force apply migration
      * @param bool $down rollback migration
      * @param bool $fake
+     * @param string $source
      * @throws MigrationException
      */
-    public function migrate($version = null, $force = false, $down = false, $fake = false)
+    public function migrate($version = null, $force = false, $down = false, $fake = false, $source = null)
     {
-        $migrations = $this->getMigrationClasses($force);
+        $migrations = $this->getMigrationClasses($force, $source);
 
         if (!is_null($version) && !$this->hasMigrationVersions($migrations, $version)) {
             throw new MigrationException(sprintf('Migration version %s is not found!', $version));
         }
 
         $currentMigrationVersion = $this->migrationVersionTable->getCurrentVersion();
+        $currentMigrationVersions = $this->migrationVersionTable->getCurrentSourceVersions();
+
         if (!is_null($version) && $version == $currentMigrationVersion && !$force) {
             throw new MigrationException(sprintf('Migration version %s is current version!', $version));
         }
@@ -138,7 +152,7 @@ class Migration implements ServiceLocatorAwareInterface
             // target migration version not set or target version is greater than last applied migration -> apply migrations
         } elseif (is_null($version) || (!is_null($version) && $version > $currentMigrationVersion)) {
             foreach ($migrations as $migration) {
-                if ($migration['version'] > $currentMigrationVersion) {
+                if (!isset($currentMigrationVersions[$migration['source']]) || ($migration['version'] > $currentMigrationVersions[$migration['source']])) {
                     if (is_null($version) || (!is_null($version) && $version >= $migration['version'])) {
                         $this->applyMigration($migration, false, $fake);
                     }
@@ -148,7 +162,7 @@ class Migration implements ServiceLocatorAwareInterface
         } elseif (!is_null($version) && $version < $currentMigrationVersion) {
             $migrationsByDesc = $this->sortMigrationsByVersionDesc($migrations);
             foreach ($migrationsByDesc as $migration) {
-                if ($migration['version'] > $version && $migration['version'] <= $currentMigrationVersion) {
+                if ($migration['version'] > $version && $migration['version'] <= $currentMigrationVersions[$migration['source']]) {
                     $this->applyMigration($migration, true, $fake);
                 }
             }
@@ -208,36 +222,66 @@ class Migration implements ServiceLocatorAwareInterface
     }
 
     /**
+     * @param \ArrayIterator $migrations
+     *
+     * @return array
+     */
+    public function getMaxMigrationSourceVersions(\ArrayIterator $migrations)
+    {
+        $data = [];
+
+        foreach ($migrations as $migration) {
+            if(!isset($data[$migration['source']])) {
+                $data[$migration['source']] = $migration['version'];
+            }
+
+            if($migration['version'] > $data[$migration['source']]) {
+                $data[$migration['source']] = $migration['version'];
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * @param bool $all
+     * @param string $source
      * @return \ArrayIterator
      */
-    public function getMigrationClasses($all = false)
+    public function getMigrationClasses($all = false, $source = null)
     {
         $classes = new \ArrayIterator();
 
-        $iterator = new \GlobIterator(sprintf('%s/Version*.php', $this->migrationsDir), \FilesystemIterator::KEY_AS_FILENAME);
-        foreach ($iterator as $item) {
-            /** @var $item \SplFileInfo */
-            if (preg_match('/(Version(\d+))\.php/', $item->getFilename(), $matches)) {
-                $applied = $this->migrationVersionTable->applied($matches[2]);
-                if ($all || !$applied) {
-                    $className = $this->migrationsNamespace . '\\' . $matches[1];
+        foreach ($this->migrationsDir as $sourceName => $sourceDir) {
+            if(!is_null($source) && $sourceName != $source) {
+                continue;
+            }
 
-                    if (!class_exists($className))
-                        /** @noinspection PhpIncludeInspection */
-                        require_once $this->migrationsDir . '/' . $item->getFilename();
+            $iterator = new \GlobIterator(sprintf('%s/Version*.php', $sourceDir), \FilesystemIterator::KEY_AS_FILENAME);
+            foreach ($iterator as $item) {
+                /** @var $item \SplFileInfo */
+                if (preg_match('/(Version(\d+))\.php/', $item->getFilename(), $matches)) {
+                    $applied = $this->migrationVersionTable->applied($matches[2]);
+                    if ($all || !$applied) {
+                        $className = $this->migrationsNamespace . '\\' . $matches[1];
 
-                    if (class_exists($className)) {
-                        $reflectionClass = new \ReflectionClass($className);
-                        $reflectionDescription = new \ReflectionProperty($className, 'description');
+                        if (!class_exists($className))
+                            /** @noinspection PhpIncludeInspection */
+                            require_once $sourceDir . '/' . $item->getFilename();
 
-                        if ($reflectionClass->implementsInterface('ZfSimpleMigrations\Library\MigrationInterface')) {
-                            $classes->append([
-                                'version' => $matches[2],
-                                'class' => $className,
-                                'description' => $reflectionDescription->getValue(),
-                                'applied' => $applied,
-                            ]);
+                        if (class_exists($className)) {
+                            $reflectionClass = new \ReflectionClass($className);
+                            $reflectionDescription = new \ReflectionProperty($className, 'description');
+
+                            if ($reflectionClass->implementsInterface('ZfSimpleMigrations\Library\MigrationInterface')) {
+                                $classes->append([
+                                                     'version' => $matches[2],
+                                                     'class' => $className,
+                                                     'description' => $reflectionDescription->getValue(),
+                                                     'applied' => $applied,
+                                                     'source' => $sourceName
+                                                 ]);
+                            }
                         }
                     }
                 }
@@ -303,7 +347,7 @@ class Migration implements ServiceLocatorAwareInterface
             if ($down) {
                 $this->migrationVersionTable->delete($migration['version']);
             } else {
-                $this->migrationVersionTable->save($migration['version']);
+                $this->migrationVersionTable->save($migration['version'], $migration['source']);
             }
             $this->connection->commit();
         } catch (InvalidQueryException $e) {

@@ -62,21 +62,28 @@ class Module implements
     public function getConsoleUsage(Console $console)
     {
         return [
+            'Initialize migrations (create DB table e.t.c.)',
+            'migration init' => '',
+
             'Get last applied migration version',
-            'migration version [<name>]' => '',
+            'migration version [<source>] [<name>]' => '',
+            ['[<source>]', 'specify which migrations data source to use, defaults to use all sources'],
             ['[<name>]', 'specify which configured migrations to run, defaults to `default`'],
 
             'List available migrations',
-            'migration list [<name>] [--all]' => '',
+            'migration list [<source>] [<name>] [--all]' => '',
             ['--all', 'Include applied migrations'],
+            ['[<source>]', 'specify which migrations data source to use, defaults to use all sources'],
             ['[<name>]', 'specify which configured migrations to run, defaults to `default`'],
 
             'Generate new migration skeleton class',
-            'migration generate [<name>]' => '',
+            'migration generate [<source>] [<name>]' => '',
+            ['[<source>]', 'specify which migrations data source to use, defaults to use all sources'],
             ['[<name>]', 'specify which configured migrations to run, defaults to `default`'],
 
             'Execute migration',
-            'migration apply [<name>] [<version>] [--force] [--down] [--fake]' => '',
+            'migration apply [<source>] [<name>] [<version>] [--force] [--down] [--fake]' => '',
+            ['[<source>]', 'specify which migrations data source to use, defaults to use all sources'],
             ['[<name>]', 'specify which configured migrations to run, defaults to `default`'],
             [
                 '--force',

@@ -15,7 +15,7 @@ return [
                 'migration-version' => [
                     'type' => 'simple',
                     'options' => [
-                        'route' => 'migration version [<name>] [--env=]',
+                        'route' => 'migration version [<source>] [<name>] [--env=]',
                         'defaults' => [
                             'controller' => 'ZfSimpleMigrations\Controller\Migrate',
                             'action' => 'version',
@@ -26,7 +26,7 @@ return [
                 'migration-list' => [
                     'type' => 'simple',
                     'options' => [
-                        'route' => 'migration list [<name>] [--env=] [--all]',
+                        'route' => 'migration list [<source>] [<name>] [--env=] [--all]',
                         'defaults' => [
                             'controller' => 'ZfSimpleMigrations\Controller\Migrate',
                             'action' => 'list',
@@ -37,7 +37,7 @@ return [
                 'migration-apply' => [
                     'type' => 'simple',
                     'options' => [
-                        'route' => 'migration apply [<name>] [<version>] [--env=] [--force] [--down] [--fake]',
+                        'route' => 'migration apply [<source>] [<name>] [<version>] [--env=] [--force] [--down] [--fake]',
                         'defaults' => [
                             'controller' => 'ZfSimpleMigrations\Controller\Migrate',
                             'action' => 'apply',
@@ -48,10 +48,21 @@ return [
                 'migration-generate' => [
                     'type' => 'simple',
                     'options' => [
-                        'route' => 'migration generate [<name>] [--env=]',
+                        'route' => 'migration generate [<source>] [<name>] [--env=]',
                         'defaults' => [
                             'controller' => 'ZfSimpleMigrations\Controller\Migrate',
                             'action' => 'generateSkeleton',
+                            'name' => 'default'
+                        ]
+                    ]
+                ],
+                'migration-init' => [
+                    'type' => 'simple',
+                    'options' => [
+                        'route' => 'migration init',
+                        'defaults' => [
+                            'controller' => 'ZfSimpleMigrations\Controller\Migrate',
+                            'action' => 'init',
                             'name' => 'default'
                         ]
                     ]

@@ -59,6 +59,14 @@ class MigrateController extends AbstractActionController
     }
 
     /**
+     * Migrations initialization
+     */
+    public function initAction()
+    {
+        $this->getMigration()->checkCreateMigrationTable();
+    }
+
+    /**
      * Get current migration version
      *
      * @return int
@@ -75,10 +83,15 @@ class MigrateController extends AbstractActionController
      */
     public function listAction()
     {
-        $migrations = $this->getMigration()->getMigrationClasses($this->getRequest()->getParam('all'));
+        $migrations = $this->getMigration()->getMigrationClasses($this->getRequest()->getParam('all'), $this->getRequest()->getParam('source'));
         $list = [];
         foreach ($migrations as $m) {
-            $list[] = sprintf("%s %s - %s", $m['applied'] ? '-' : '+', $m['version'], $m['description']);
+            $list[] = ($m['applied'] ? OutputWriter::LIGHTGRAY : OutputWriter::LIGHTGREEN) .
+                      sprintf(
+                          "%s %s %s - %s", $m['applied'] ? '-' : '+', $m['version'],
+                          str_pad('[' . substr($m['source'], 0, 20) . ']', 22, ' '),
+                          $m['description']) .
+                      OutputWriter::NO_COLOR;
         }
         return (empty($list) ? 'No migrations available.' : implode("\n", $list)) . "\n";
     }
@@ -89,9 +102,10 @@ class MigrateController extends AbstractActionController
     public function applyAction()
     {
         $migrations = $this->getMigration()->getMigrationClasses();
-        $currentMigrationVersion = $this->getMigration()->getCurrentVersion();
+        $currentMigrationVersions = $this->getMigration()->getCurrentSourceVersions();
 
         $version = $this->getRequest()->getParam('version');
+        $source = $this->getRequest()->getParam('source');
         $force = $this->getRequest()->getParam('force');
         $down = $this->getRequest()->getParam('down');
         $fake = $this->getRequest()->getParam('fake');
@@ -103,12 +117,24 @@ class MigrateController extends AbstractActionController
         if (is_null($version) && $fake) {
             return "Can't fake migration apply without migration version explicitly set.";
         }
-        if (!$force && is_null($version) && $currentMigrationVersion >= $this->getMigration()->getMaxMigrationVersion($migrations)) {
-            return "No migrations to apply.\n";
+
+        $noMigrationsToApply = true;
+        $maxMigrationVersionsBySource = $this->getMigration()->getMaxMigrationSourceVersions($migrations);
+
+        foreach ($maxMigrationVersionsBySource as $source => $_version) {
+            if (!$force && is_null($version) && isset($currentMigrationVersions[$source]) && $currentMigrationVersions[$source] >= $_version) {
+                //$noMigrationsToApply = true;
+            } else {
+                $noMigrationsToApply = false;
+            }
         }
 
-        $this->getMigration()->migrate($version, $force, $down, $fake);
-        return "Migrations applied!\n";
+        if(!$force && is_null($version) && $noMigrationsToApply) {
+            return OutputWriter::CYAN .  "No migrations to apply.\n" . OutputWriter::NO_COLOR;
+        }
+
+        $this->getMigration()->migrate($version, $force, $down, $fake, $source);
+        return OutputWriter::CYAN . "Migrations applied!\n" . OutputWriter::NO_COLOR;
     }
 
     /**
@@ -116,9 +142,9 @@ class MigrateController extends AbstractActionController
      */
     public function generateSkeletonAction()
     {
-        $classPath = $this->getSkeletonGenerator()->generate();
+        $classPath = $this->getSkeletonGenerator()->generate($this->getRequest()->getParam('source'));
 
-        return sprintf("Generated skeleton class @ %s\n", realpath($classPath));
+        return OutputWriter::LIGHTGREEN . sprintf("Generated skeleton class @ %s\n", realpath($classPath)) . OutputWriter::NO_COLOR;
     }
 
     /**

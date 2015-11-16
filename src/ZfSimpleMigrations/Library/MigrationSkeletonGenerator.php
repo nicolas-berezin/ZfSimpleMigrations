@@ -17,28 +17,42 @@ class MigrationSkeletonGenerator
      */
     public function __construct($migrationsDir, $migrationsNamespace)
     {
-        $this->migrationsDir = $migrationsDir;
+        $this->migrationsDir = is_array($migrationsDir) ? $migrationsDir : ['default' => $migrationsDir];
         $this->migrationNamespace = $migrationsNamespace;
 
-        if (!is_dir($this->migrationsDir)) {
-            if (!mkdir($this->migrationsDir, 0775)) {
-                throw new MigrationException(sprintf('Failed to create migrations directory %s', $this->migrationsDir));
+        foreach ($this->migrationsDir as $source) {
+            if (!is_dir($source)) {
+                if (!mkdir($source, 0775)) {
+                    throw new MigrationException(sprintf('Failed to create migrations directory %s', $source));
+                }
             }
-        } elseif (!is_writable($this->migrationsDir)) {
-            throw new MigrationException(sprintf('Migrations directory is not writable %s', $this->migrationsDir));
+        }
+
+        if (!is_writable($source)) {
+            throw new MigrationException(sprintf('Migrations directory is not writable %s', $source));
         }
     }
 
     /**
      * Generate new migration skeleton class
      *
+     * @param string $source
      * @return string path to new skeleton class file
      * @throws MigrationException
      */
-    public function generate()
+    public function generate($source = null)
     {
         $className = 'Version' . date('YmdHis', time());
-        $classPath = $this->migrationsDir . DIRECTORY_SEPARATOR . $className . '.php';
+
+        if(!is_null($source) && isset($this->migrationsDir[$source])) {
+            $dir = $this->migrationsDir[$source];
+        } elseif(isset($this->migrationsDir['default'])) {
+            $dir = $this->migrationsDir['default'];
+        } else {
+            throw new MigrationException('You do not specify "default" migration data source in migrations config dir section.');
+        }
+
+        $classPath = $dir . DIRECTORY_SEPARATOR . $className . '.php';
 
         if (file_exists($classPath)) {
             throw new MigrationException(sprintf('Migration %s exists!', $className));
