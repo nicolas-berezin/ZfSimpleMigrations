@@ -73,7 +73,7 @@ class MigrateController extends AbstractActionController
      */
     public function versionAction()
     {
-        return sprintf("Current version %s\n", $this->getMigration()->getCurrentVersion());
+        return OutputWriter::CYAN . sprintf("Current version %s\n", $this->getMigration()->getCurrentVersion()) . OutputWriter::NO_COLOR;
     }
 
     /**

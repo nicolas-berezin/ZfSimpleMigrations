@@ -14,8 +14,34 @@ The following DB adapter drivers are supported by this module.
 
 ### Using composer
 
+Add following code to your composer.json file
+
+```php
+...
+"require" : {
+    "nicolas-berezin/zf-simple-migrations" : "dev-master",
+},
+...
+"repositories": [
+  {
+    "type": "package",
+    "package": {
+      "name": "nicolas-berezin/zf-simple-migrations",
+      "version": "dev-master",
+      "source": {
+        "url": "https://github.com/nicolas-berezin/ZfSimpleMigrations.git",
+        "type": "git",
+        "reference": "master"
+      },
+      "autoload": {
+        "classmap": [""]
+      }
+    }
+  }
+]
+```
+
 ```bash
-php composer.phar require vgarvardt/zf-simple-migrations:dev-master
 php composer.phar update
 ```
 add `ZfSimpleMigrations` to the `modules` array in application.config.php
@@ -24,12 +50,13 @@ add `ZfSimpleMigrations` to the `modules` array in application.config.php
 
 ### Available commands
 
-* `migration version [<name>]` - show last applied migration (`name` specifies a configured migration)
-* `migration list [<name>] [--all]` - list available migrations (`all` includes applied migrations)
-* `migration apply [<name>] [<version>] [--force] [--down] [--fake]` - apply or rollback migration
-* `migration generate [<name>]` - generate migration skeleton class
+* `migration init` - initialize migration module (create DB table e.t.c)
+* `migration version [<source>] [<name>]` - show last applied migration (`source` specifies a migration files path and `name` specifies a configured migration)
+* `migration list [<source>] [<name>] [--all]` - list available migrations (`source` specifies a migration files path and `all` includes applied migrations)
+* `migration apply [<source>] [<name>] [<version>] [--force] [--down] [--fake]` - apply or rollback migration (`source` specifies a migration files path)
+* `migration generate [<source>] [<name>]` - generate migration skeleton class (`source` specifies a migration files path where migration file will be generated)
 
-Migration classes are stored in `/path/to/project/migrations/` dir by default.
+Migration classes are stored in `/path/to/project/module/Application/migrations/` dir by default.
 
 Generic migration class has name `Version<YmdHis>` and implement `ZfSimpleMigrations\Library\MigrationInterface`.
 
@@ -169,7 +196,10 @@ the following keys.
 
 ##### Sub-key: `dir`
 
-The path to the directory where migration files are stored. Defaults to `./migrations` in the project root dir.
+Array of paths to the directories where migration files are stored.
+Each path represents a single migration files source.
+Defaults to `./migrations` in the project Application module dir.
+Every module with migrations needs to register it's own migration files source in "dir" section.
 
 ##### Sub-key: `namespace` 
 
@@ -186,15 +216,14 @@ The service alias that will be used to fetch a `Zend\Db\Adapter\Adapter` from th
 #### User configuration example:
 
 ```php
-'migrations' => array(
-    'default' => array(
-            'dir' => dirname(__FILE__) . '/../../../../migrations-app',
-            'namespace' => 'App\Migrations',    
-    ),
-    'albums' => array(
-            'dir' => dirname(__FILE__) . '/../../../../migrations-albums',
-            'namespace' => 'Albums\Migrations',
-            'adapter' => 'AlbumDb'    
-    ),
-),
+'migrations' => [
+    'default' => [
+        'dir' => [
+            'default' => dirname(__FILE__) . '/../../module/Application/migrations',
+        ],
+        'namespace' => 'ZfSimpleMigrations\Migrations',
+        'show_log' => true,
+        'adapter' => 'Zend\Db\Adapter\Adapter'
+    ]
+]
 ```
